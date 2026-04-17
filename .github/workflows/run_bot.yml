@@ -1,0 +1,78 @@
+name: News Bot
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+jobs:
+  run:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Cache pip dependencies
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/pip
+          key: ${{ runner.os }}-pip-${{ hashFiles('news_bot/requirements.txt') }}
+          restore-keys: |
+            ${{ runner.os }}-pip-
+
+      - name: Install dependencies
+        run: pip install -r news_bot/requirements.txt
+
+      - name: Run news bot
+        run: python news_bot/main.py
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          WEBHOOK_QUEUE: ${{ secrets.WEBHOOK_QUEUE }}
+          WEBHOOK_INDIA_GENERAL: ${{ secrets.WEBHOOK_INDIA_GENERAL }}
+          WEBHOOK_INDIA_POLITICS: ${{ secrets.WEBHOOK_INDIA_POLITICS }}
+          WEBHOOK_INDIA_PARLIAMENT: ${{ secrets.WEBHOOK_INDIA_PARLIAMENT }}
+          WEBHOOK_INDIA_ELECTIONS: ${{ secrets.WEBHOOK_INDIA_ELECTIONS }}
+          WEBHOOK_INDIA_GOVT_POLICY: ${{ secrets.WEBHOOK_INDIA_GOVT_POLICY }}
+          WEBHOOK_INDIA_ECONOMY: ${{ secrets.WEBHOOK_INDIA_ECONOMY }}
+          WEBHOOK_INDIA_STATES: ${{ secrets.WEBHOOK_INDIA_STATES }}
+          WEBHOOK_HINDU_MUSLIM: ${{ secrets.WEBHOOK_HINDU_MUSLIM }}
+          WEBHOOK_SCANDALS_OUTRAGES: ${{ secrets.WEBHOOK_SCANDALS_OUTRAGES }}
+          WEBHOOK_PAK_GENERAL: ${{ secrets.WEBHOOK_PAK_GENERAL }}
+          WEBHOOK_PAK_GOVERNMENT: ${{ secrets.WEBHOOK_PAK_GOVERNMENT }}
+          WEBHOOK_PAK_MILITARY: ${{ secrets.WEBHOOK_PAK_MILITARY }}
+          WEBHOOK_PAK_ECONOMY: ${{ secrets.WEBHOOK_PAK_ECONOMY }}
+          WEBHOOK_GEOPOLITICS: ${{ secrets.WEBHOOK_GEOPOLITICS }}
+          WEBHOOK_WARS_CONFLICTS: ${{ secrets.WEBHOOK_WARS_CONFLICTS }}
+          WEBHOOK_WORLD_GENERAL: ${{ secrets.WEBHOOK_WORLD_GENERAL }}
+          WEBHOOK_INDIA_MARKETS: ${{ secrets.WEBHOOK_INDIA_MARKETS }}
+          WEBHOOK_GLOBAL_ECONOMY: ${{ secrets.WEBHOOK_GLOBAL_ECONOMY }}
+          WEBHOOK_DEFENCE: ${{ secrets.WEBHOOK_DEFENCE }}
+          WEBHOOK_YOUTUBE: ${{ secrets.WEBHOOK_YOUTUBE }}
+          WEBHOOK_API_NEWS: ${{ secrets.WEBHOOK_API_NEWS }}
+          WEBHOOK_GOOGLE_ALERTS: ${{ secrets.WEBHOOK_GOOGLE_ALERTS }}
+          WEBHOOK_MORNING_BRIEFING: ${{ secrets.WEBHOOK_MORNING_BRIEFING }}
+          WEBHOOK_EVENING_WRAP: ${{ secrets.WEBHOOK_EVENING_WRAP }}
+          WEBHOOK_BOT_LOGS: ${{ secrets.WEBHOOK_BOT_LOGS }}
+          WEBHOOK_ERRORS: ${{ secrets.WEBHOOK_ERRORS }}
+          WEBHOOK_FEED_HEALTH: ${{ secrets.WEBHOOK_FEED_HEALTH }}
+          NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
+          GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
+          CURRENTS_KEY: ${{ secrets.CURRENTS_KEY }}
+
+      - name: Commit updated database
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add news_bot/seen_articles.db
+          git diff --staged --quiet || git commit -m "chore: update seen_articles DB [skip ci]"
+          git push
