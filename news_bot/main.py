@@ -58,25 +58,19 @@ def _process_one(article: dict) -> dict:
 
 
 def _check_groq_key() -> bool:
-    if not config.GROQ_API_KEY:
+    key = config.GROQ_API_KEY
+    if not key:
         msg = "GROQ_API_KEY is missing or empty. Check GitHub Secrets."
         print(f"[MAIN] ERROR: {msg}")
         poster.post_error(msg)
         return False
-    try:
-        # Minimal ping — 1 token just to confirm auth works
-        processor._get_client().chat.completions.create(
-            model=config.GROQ_MODEL,
-            messages=[{"role": "user", "content": "ping"}],
-            max_tokens=1,
-        )
-        print("[MAIN] Groq API key verified OK.")
-        return True
-    except Exception as e:
-        msg = f"Groq API key check failed: {type(e).__name__}: {e}"
+    if not key.startswith("gsk_"):
+        msg = f"GROQ_API_KEY looks malformed (expected gsk_..., got {key[:6]}...). Re-copy from console.groq.com."
         print(f"[MAIN] ERROR: {msg}")
         poster.post_error(msg)
         return False
+    print(f"[MAIN] GROQ_API_KEY present ({key[:8]}...).")
+    return True
 
 
 def main() -> None:
