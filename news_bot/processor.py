@@ -157,6 +157,7 @@ def process_article(
         return result
 
     except Exception as e:
-        print(f"[PROCESSOR] Groq error for '{title[:60]}': {e}")
+        print(f"[PROCESSOR] Groq error for '{title[:60]}': {type(e).__name__}: {e}")
+        fallback["_groq_error"] = f"{type(e).__name__}: {e}"
         time.sleep(config.GROQ_DELAY)
         return fallback

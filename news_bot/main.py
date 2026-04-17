@@ -57,12 +57,38 @@ def _process_one(article: dict) -> dict:
     )
 
 
+def _check_groq_key() -> bool:
+    if not config.GROQ_API_KEY:
+        msg = "GROQ_API_KEY is missing or empty. Check GitHub Secrets."
+        print(f"[MAIN] ERROR: {msg}")
+        poster.post_error(msg)
+        return False
+    try:
+        # Minimal ping — 1 token just to confirm auth works
+        processor._get_client().chat.completions.create(
+            model=config.GROQ_MODEL,
+            messages=[{"role": "user", "content": "ping"}],
+            max_tokens=1,
+        )
+        print("[MAIN] Groq API key verified OK.")
+        return True
+    except Exception as e:
+        msg = f"Groq API key check failed: {type(e).__name__}: {e}"
+        print(f"[MAIN] ERROR: {msg}")
+        poster.post_error(msg)
+        return False
+
+
 def main() -> None:
     run_start = datetime.now(timezone.utc)
     print(f"[MAIN] News bot starting at {run_start.isoformat()}")
 
     database.init_db()
     database.purge_old_stories()
+
+    if not _check_groq_key():
+        poster.post_log("Run aborted: Groq key invalid. No articles processed.")
+        return
 
     # ── digest check ──────────────────────────────────────────────────────
     if _is_digest_time(*_MORNING_UTC):
@@ -114,6 +140,11 @@ def main() -> None:
                 f"{article['title'][:70]}"
             )
             ai_result = _process_one(article)
+            if ai_result.get("_groq_error"):
+                poster.post_error(
+                    f"Groq failed for: {article['title'][:80]}\n"
+                    f"Error: {ai_result['_groq_error']}"
+                )
             poster.post_article(article, ai_result)
             database.mark_seen(article)
             database.save_daily_story(article, ai_result)
