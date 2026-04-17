@@ -1,21 +1,37 @@
+from __future__ import annotations
+
 import json
 import random
 import re
 import time
 
-from groq import Groq
+from groq import Groq, RateLimitError as GroqRateLimitError
+import google.generativeai as genai
 
 import config
 
-_client: Groq | None = None
+# ── clients (lazy-initialised) ─────────────────────────────────────────────────
+
+_groq_client: Groq | None = None
+_gemini_ready: bool = False
 
 
-def _get_client() -> Groq:
-    global _client
-    if _client is None:
-        _client = Groq(api_key=config.GROQ_API_KEY)
-    return _client
+def _get_groq() -> Groq:
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=config.GROQ_API_KEY)
+    return _groq_client
 
+
+def _get_gemini() -> bool:
+    global _gemini_ready
+    if not _gemini_ready and config.GEMINI_API_KEY:
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        _gemini_ready = True
+    return _gemini_ready
+
+
+# ── prompts ────────────────────────────────────────────────────────────────────
 
 _SYSTEM_PROMPT = """\
 You are two things at once, and you must do both in a single JSON response.
@@ -53,7 +69,6 @@ Use the HISTORICAL format:
 [State the news in one sentence] + [One sentence drawing a specific parallel to a past event with year and outcome] + [One sentence on what that precedent suggests will happen next].""",
 }
 
-
 _USER_TEMPLATE = """\
 Analyze this news article and return ONLY a raw JSON object.
 
@@ -78,6 +93,85 @@ Return this exact JSON:
 }}"""
 
 
+# ── shared helpers ─────────────────────────────────────────────────────────────
+
+def _build_prompt(title: str, description: str, body: str | None,
+                  source: str, category: str, x_format_key: str) -> str:
+    groq_body = (body or "")[:600] or "Not available"
+    groq_desc = (description or "")[:300] or "Not available"
+    return _USER_TEMPLATE.format(
+        source=source,
+        category=category,
+        title=title,
+        description=groq_desc,
+        body=groq_body,
+        x_format_instruction=_X_FORMAT_INSTRUCTIONS[x_format_key],
+    )
+
+
+def _parse_raw(raw: str) -> dict:
+    raw = raw.strip()
+    raw = re.sub(r"^```(?:json)?\s*", "", raw)
+    raw = re.sub(r"\s*```$", "", raw)
+
+    def _fix_newlines(m: re.Match) -> str:
+        return m.group(0).replace("\n", "\\n").replace("\r", "")
+
+    raw = re.sub(r'(?<=": ")(.*?)(?="(?:\s*[,}]))', _fix_newlines, raw, flags=re.DOTALL)
+    return json.loads(raw)
+
+
+def _sanitise(result: dict, title: str, category: str, x_format_key: str) -> dict:
+    if result.get("category_refined") not in config.VALID_CATEGORIES:
+        result["category_refined"] = category
+    result.setdefault("tweaked_title", title)
+    result.setdefault("summary_points", ["No summary available."])
+    result.setdefault("why_it_matters", "")
+    result.setdefault("confidence", "unverified")
+    result.setdefault("flag", "🌐")
+    result.setdefault("impact_score", 5)
+    result.setdefault("x_post", "")
+
+    x = result["x_post"]
+    x = re.sub(r"\u2014|\u2013|--", " ", x)
+    x = re.sub(r"[^\x00-\x7F\u0900-\u097F\s]", "", x)
+    result["x_post"] = x.strip()
+    result["x_format"] = x_format_key
+    return result
+
+
+# ── provider calls ─────────────────────────────────────────────────────────────
+
+def _call_groq(user_prompt: str) -> str:
+    response = _get_groq().chat.completions.create(
+        model=config.GROQ_MODEL,
+        messages=[
+            {"role": "system", "content": _SYSTEM_PROMPT},
+            {"role": "user", "content": user_prompt},
+        ],
+        temperature=0.5,
+        max_tokens=1500,
+    )
+    return response.choices[0].message.content
+
+
+def _call_gemini(user_prompt: str) -> str:
+    model = genai.GenerativeModel(
+        model_name=config.GEMINI_MODEL,
+        system_instruction=_SYSTEM_PROMPT,
+    )
+    response = model.generate_content(
+        user_prompt,
+        generation_config=genai.GenerationConfig(
+            temperature=0.5,
+            max_output_tokens=1500,
+        ),
+    )
+    return response.text
+
+
+# ── public entry point ─────────────────────────────────────────────────────────
+
 def process_article(
     title: str,
     description: str,
@@ -97,67 +191,42 @@ def process_article(
     }
 
     x_format_key = random.choice(["impact", "contrarian", "historical"])
-    x_format_instruction = _X_FORMAT_INSTRUCTIONS[x_format_key]
+    user_prompt = _build_prompt(title, description, body, source, category, x_format_key)
 
-    user_prompt = _USER_TEMPLATE.format(
-        source=source,
-        category=category,
-        title=title,
-        description=description or "Not available",
-        body=body or "Not available",
-        x_format_instruction=x_format_instruction,
-    )
+    raw: str | None = None
+    provider_used = "none"
+
+    # ── Try Groq first ────────────────────────────────────────────────────
+    if config.GROQ_API_KEY:
+        try:
+            raw = _call_groq(user_prompt)
+            provider_used = "groq"
+        except GroqRateLimitError as e:
+            print(f"[PROCESSOR] Groq rate limit hit, falling back to Gemini. ({e})")
+        except Exception as e:
+            print(f"[PROCESSOR] Groq error for '{title[:60]}': {type(e).__name__}: {e}")
+            fallback["_groq_error"] = f"{type(e).__name__}: {e}"
+
+    # ── Fall back to Gemini if Groq failed or hit rate limit ──────────────
+    if raw is None and _get_gemini():
+        try:
+            raw = _call_gemini(user_prompt)
+            provider_used = "gemini"
+        except Exception as e:
+            print(f"[PROCESSOR] Gemini error for '{title[:60]}': {type(e).__name__}: {e}")
+            fallback["_groq_error"] = fallback.get("_groq_error", "") + f" | Gemini: {type(e).__name__}: {e}"
+
+    time.sleep(config.GROQ_DELAY)
+
+    if raw is None:
+        return fallback
 
     try:
-        response = _get_client().chat.completions.create(
-            model=config.GROQ_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM_PROMPT},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.5,
-            max_tokens=1500,
-        )
-        raw = response.choices[0].message.content.strip()
-
-        # Strip accidental markdown fences
-        raw = re.sub(r"^```(?:json)?\s*", "", raw)
-        raw = re.sub(r"\s*```$", "", raw)
-
-        # Repair common model mistake: literal newlines inside JSON string values
-        def _fix_newlines(m: re.Match) -> str:
-            return m.group(0).replace("\n", "\\n").replace("\r", "")
-
-        raw = re.sub(r'(?<=": ")(.*?)(?="(?:\s*[,}]))', _fix_newlines, raw, flags=re.DOTALL)
-
-        result = json.loads(raw)
-
-        # Validate category; reject hallucinated values
-        if result.get("category_refined") not in config.VALID_CATEGORIES:
-            result["category_refined"] = category
-
-        result.setdefault("tweaked_title", title)
-        result.setdefault("summary_points", ["No summary available."])
-        result.setdefault("why_it_matters", "")
-        result.setdefault("confidence", "unverified")
-        result.setdefault("flag", "🌐")
-        result.setdefault("impact_score", 5)
-        result.setdefault("x_post", "")
-
-        # Enforce hard rules as a post-processing safety net
-        x = result["x_post"]
-        x = re.sub(r"\u2014|\u2013|--", " ", x)   # remove all dash variants
-        x = re.sub(r"[^\x00-\x7F\u0900-\u097F\s]", "", x)  # strip non-ASCII except Devanagari
-        result["x_post"] = x.strip()
-
-        # Store which format was used so poster can label it
-        result["x_format"] = x_format_key
-
-        time.sleep(config.GROQ_DELAY)
+        result = _parse_raw(raw)
+        result = _sanitise(result, title, category, x_format_key)
+        result["_provider"] = provider_used
         return result
-
     except Exception as e:
-        print(f"[PROCESSOR] Groq error for '{title[:60]}': {type(e).__name__}: {e}")
-        fallback["_groq_error"] = f"{type(e).__name__}: {e}"
-        time.sleep(config.GROQ_DELAY)
+        print(f"[PROCESSOR] JSON parse error ({provider_used}) for '{title[:60]}': {e}\nRaw: {raw[:300]}")
+        fallback["_groq_error"] = f"JSON parse failed ({provider_used}): {e}"
         return fallback

@@ -4,20 +4,30 @@ import json
 from datetime import datetime, timezone
 
 import requests
-from groq import Groq
+from groq import Groq, RateLimitError as GroqRateLimitError
+import google.generativeai as genai
 
 import config
 import database
 from config import BOT_AVATAR_URL, BOT_USERNAME, WEBHOOK_URLS
 
-_client: Groq | None = None
+_groq_client: Groq | None = None
+_gemini_ready: bool = False
 
 
-def _get_client() -> Groq:
-    global _client
-    if _client is None:
-        _client = Groq(api_key=config.GROQ_API_KEY)
-    return _client
+def _get_groq() -> Groq:
+    global _groq_client
+    if _groq_client is None:
+        _groq_client = Groq(api_key=config.GROQ_API_KEY)
+    return _groq_client
+
+
+def _get_gemini() -> bool:
+    global _gemini_ready
+    if not _gemini_ready and config.GEMINI_API_KEY:
+        genai.configure(api_key=config.GEMINI_API_KEY)
+        _gemini_ready = True
+    return _gemini_ready
 
 
 def _send_digest(content: str, is_morning: bool) -> None:
@@ -74,23 +84,42 @@ Stories: {stories_json}
 
 Rules: Under 1800 chars total. Specific facts only. No filler words."""
 
-    try:
-        response = _get_client().chat.completions.create(
-            model=config.GROQ_MODEL,
-            messages=[
-                {
-                    "role": "system",
-                    "content": "You are a senior political news editor for an Indian audience.",
-                },
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=0.4,
-            max_tokens=700,
-        )
-        return response.choices[0].message.content.strip()
-    except Exception as e:
-        print(f"[DIGEST] Groq error: {e}")
-        return f"**{label} BRIEFING — {date_str} (IST)**\n\n*Digest generation failed. Check bot logs.*"
+    system = "You are a senior political news editor for an Indian audience."
+
+    # Try Groq first
+    if config.GROQ_API_KEY:
+        try:
+            response = _get_groq().chat.completions.create(
+                model=config.GROQ_MODEL,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_prompt},
+                ],
+                temperature=0.4,
+                max_tokens=700,
+            )
+            return response.choices[0].message.content.strip()
+        except GroqRateLimitError:
+            print("[DIGEST] Groq rate limit hit, falling back to Gemini.")
+        except Exception as e:
+            print(f"[DIGEST] Groq error: {e}")
+
+    # Fall back to Gemini
+    if _get_gemini():
+        try:
+            model = genai.GenerativeModel(
+                model_name=config.GEMINI_MODEL,
+                system_instruction=system,
+            )
+            response = model.generate_content(
+                user_prompt,
+                generation_config=genai.GenerationConfig(temperature=0.4, max_output_tokens=700),
+            )
+            return response.text.strip()
+        except Exception as e:
+            print(f"[DIGEST] Gemini error: {e}")
+
+    return f"**{label} BRIEFING — {date_str} (IST)**\n\n*Digest generation failed. Check bot logs.*"
 
 
 def morning_digest() -> None:

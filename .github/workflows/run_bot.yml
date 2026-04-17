@@ -65,6 +65,7 @@ jobs:
           WEBHOOK_BOT_LOGS: ${{ secrets.WEBHOOK_BOT_LOGS }}
           WEBHOOK_ERRORS: ${{ secrets.WEBHOOK_ERRORS }}
           WEBHOOK_FEED_HEALTH: ${{ secrets.WEBHOOK_FEED_HEALTH }}
+          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
           GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
           CURRENTS_KEY: ${{ secrets.CURRENTS_KEY }}
