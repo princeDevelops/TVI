@@ -129,11 +129,7 @@ def post_article(article: dict, ai_result: dict) -> None:
         "\n".join(f"• {p}" for p in summary_points) if summary_points else "• Not available"
     )
     x_post = ai_result.get("x_post", "").strip()
-    x_format = ai_result.get("x_format", "")
     impact_score = ai_result.get("impact_score", 5)
-
-    _X_FORMAT_LABELS = {"impact": "Impact", "contrarian": "Contrarian", "historical": "Historical"}
-    x_label = _X_FORMAT_LABELS.get(x_format, "Insight")
 
     def _field(name: str, value: str) -> dict:
         return {"name": name, "value": value[:1024] or "\u200b", "inline": False}
@@ -149,7 +145,7 @@ def post_article(article: dict, ai_result: dict) -> None:
     fields.append(_field("📌 Why It Matters", why_it_matters or "*Not available.*"))
     if x_post:
         x_value = f"```\n{x_post[:980]}\n```"
-        fields.append(_field(f"X Post [{x_label}] • Impact {impact_score}/10", x_value))
+        fields.append(_field(f"X Post • Impact {impact_score}/10", x_value))
 
     embed: dict = {
         "color": color,
