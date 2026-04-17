@@ -116,13 +116,19 @@ def process_article(
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.5,
-            max_tokens=900,
+            max_tokens=1500,
         )
         raw = response.choices[0].message.content.strip()
 
         # Strip accidental markdown fences
         raw = re.sub(r"^```(?:json)?\s*", "", raw)
         raw = re.sub(r"\s*```$", "", raw)
+
+        # Repair common model mistake: literal newlines inside JSON string values
+        def _fix_newlines(m: re.Match) -> str:
+            return m.group(0).replace("\n", "\\n").replace("\r", "")
+
+        raw = re.sub(r'(?<=": ")(.*?)(?="(?:\s*[,}]))', _fix_newlines, raw, flags=re.DOTALL)
 
         result = json.loads(raw)
 

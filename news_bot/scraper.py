@@ -79,7 +79,4 @@ def _extract_body(soup: BeautifulSoup) -> Optional[str]:
     if len(body) < 100:
         return None
 
-    if len(body) > 1200:
-        body = body[:1200] + "..."
-
     return body
