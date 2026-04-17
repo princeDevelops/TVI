@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from datetime import datetime, timezone
 
@@ -13,6 +14,17 @@ from config import (
     WEBHOOK_DELAY,
     WEBHOOK_URLS,
 )
+
+def _strip_html(text: str) -> str:
+    text = re.sub(r"<[^>]+>", "", text)
+    text = re.sub(r"&nbsp;", " ", text)
+    text = re.sub(r"&amp;", "&", text)
+    text = re.sub(r"&lt;", "<", text)
+    text = re.sub(r"&gt;", ">", text)
+    text = re.sub(r"&quot;", '"', text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 _CONFIDENCE_COLORS = {
     "confirmed":  3066993,
@@ -111,8 +123,8 @@ def post_article(article: dict, ai_result: dict) -> None:
     time_ago_str = _time_ago(published)
     ts = _published_iso(published)
 
-    raw_desc = (article.get("description") or "").strip()
-    body_text = (article.get("body") or "").strip()
+    raw_desc = _strip_html((article.get("description") or "").strip())
+    body_text = _strip_html((article.get("body") or "").strip())
     summary_str = (
         "\n".join(f"• {p}" for p in summary_points) if summary_points else "• Not available"
     )
@@ -126,40 +138,31 @@ def post_article(article: dict, ai_result: dict) -> None:
     def _field(name: str, value: str) -> dict:
         return {"name": name, "value": value[:1024] or "\u200b", "inline": False}
 
+    # Body goes in description (4096 char limit) — stays as one unbroken block
+    body_section = body_text[:4000] if body_text else "*Body not available for this source.*"
+
     fields = []
-
     fields.append(_field("📰 Original Headline", article["title"]))
-
     if raw_desc:
         fields.append(_field("📄 RSS Description", raw_desc[:1024]))
-
-    if body_text:
-        # Split body across multiple fields if it exceeds 1024 chars
-        chunk_size = 1020
-        chunks = [body_text[i : i + chunk_size] for i in range(0, len(body_text), chunk_size)]
-        for idx, chunk in enumerate(chunks[:4]):  # max 4 fields = 4080 chars of body
-            label = "📖 Article Body" if idx == 0 else "📖 Article Body (cont.)"
-            fields.append(_field(label, chunk))
-    else:
-        fields.append(_field("📖 Article Body", "*Not available for this source.*"))
-
     fields.append(_field("💡 AI Summary", summary_str))
     fields.append(_field("📌 Why It Matters", why_it_matters or "*Not available.*"))
-
     if x_post:
         x_value = f"```\n{x_post[:980]}\n```"
         fields.append(_field(f"X Post [{x_label}] • Impact {impact_score}/10", x_value))
 
     embed: dict = {
         "color": color,
-        "author": {"name": f"{flag} {article['source']} • {category_label}"},
+        "author": {
+            "name": f"{flag}  {category_label.upper()}  •  {article['source']}  •  {time_ago_str}"
+        },
         "title": tweaked_title[:256],
         "url": article["url"],
+        "description": f"**📖 Article Body**\n{body_section}",
         "fields": fields,
         "footer": {
             "text": (
-                f"{conf_emoji} {confidence} • 📰 {article['source']} "
-                f"• 🕐 {time_ago_str} • 🤖 llama-3.3-70b"
+                f"{conf_emoji} {confidence.capitalize()} • 🤖 llama-3.3-70b"
             )
         },
     }
