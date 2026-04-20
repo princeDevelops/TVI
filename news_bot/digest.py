@@ -57,6 +57,7 @@ def _build_digest(is_morning: bool) -> str:
         "world-general": "WORLD",
         "global-economy": "GLOBAL ECONOMY",
         "defence": "DEFENCE",
+        "brics": "BRICS",
     }
 
     lines = [f"**{label} — {date_str} (IST)**\n"]

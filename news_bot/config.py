@@ -24,6 +24,7 @@ WEBHOOK_URLS = {
     "india-markets":     os.getenv("WEBHOOK_INDIA_MARKETS"),
     "global-economy":    os.getenv("WEBHOOK_GLOBAL_ECONOMY"),
     "defence":           os.getenv("WEBHOOK_DEFENCE"),
+    "brics":             os.getenv("WEBHOOK_BRICS"),
     "youtube":           os.getenv("WEBHOOK_YOUTUBE"),
     "api-news":          os.getenv("WEBHOOK_API_NEWS"),
     "google-alerts":     os.getenv("WEBHOOK_GOOGLE_ALERTS"),
@@ -31,6 +32,7 @@ WEBHOOK_URLS = {
     "evening-wrap":      os.getenv("WEBHOOK_EVENING_WRAP"),
     "bot-logs":          os.getenv("WEBHOOK_BOT_LOGS"),
     "errors":            os.getenv("WEBHOOK_ERRORS"),
+    "breaking-alerts":   os.getenv("WEBHOOK_BREAKING_ALERTS"),
     "feed-health":       os.getenv("WEBHOOK_FEED_HEALTH"),
 }
 
@@ -54,6 +56,7 @@ CATEGORY_LABELS = {
     "india-markets":     "India Markets",
     "global-economy":    "Global Economy",
     "defence":           "Defence",
+    "brics":             "BRICS",
     "youtube":           "YouTube",
     "api-news":          "API News",
     "google-alerts":     "Google Alerts",
@@ -261,6 +264,69 @@ FEEDS = [
         "name": "The Defense Post",
         "url": "https://www.thedefensepost.com/feed/",
         "category": "defence",
+        "type": "rss",
+    },
+    {
+        "name": "The Print Defence",
+        "url": "https://theprint.in/category/defence/feed/",
+        "category": "defence",
+        "type": "rss",
+    },
+    {
+        "name": "Livefist Defence",
+        "url": "https://www.livefist.com/feeds/posts/default",
+        "category": "defence",
+        "type": "rss",
+    },
+    {
+        "name": "Indian Defence Review",
+        "url": "https://www.indiandefencereview.com/feed/",
+        "category": "defence",
+        "type": "rss",
+    },
+    # ── Geopolitics ────────────────────────────────────────────────────────
+    {
+        "name": "The Diplomat",
+        "url": "https://thediplomat.com/feed/",
+        "category": "geopolitics",
+        "type": "rss",
+    },
+    {
+        "name": "ORF India",
+        "url": "https://www.orfonline.org/feed/",
+        "category": "geopolitics",
+        "type": "rss",
+    },
+    {
+        "name": "Firstpost World",
+        "url": "https://www.firstpost.com/rss/world.xml",
+        "category": "geopolitics",
+        "type": "rss",
+    },
+    # ── BRICS ──────────────────────────────────────────────────────────────
+    {
+        "name": "TASS English",
+        "url": "https://tass.com/rss/v2.xml",
+        "category": "brics",
+        "type": "rss",
+    },
+    {
+        "name": "Global Times",
+        "url": "https://www.globaltimes.cn/rss/outbrain.xml",
+        "category": "brics",
+        "type": "rss",
+    },
+    {
+        "name": "Daily Maverick SA",
+        "url": "https://www.dailymaverick.co.za/feed/",
+        "category": "brics",
+        "type": "rss",
+    },
+    # ── Google Alerts ──────────────────────────────────────────────────────
+    {
+        "name": "Google Alerts",
+        "url": "https://www.google.co.in/alerts/feeds/16192332283874439099/16393250519301350627",
+        "category": "google-alerts",
         "type": "rss",
     },
     # ── YouTube ────────────────────────────────────────────────────────────

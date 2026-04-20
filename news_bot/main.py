@@ -19,7 +19,7 @@ import scraper
 
 _MORNING_UTC = (1, 30)
 _EVENING_UTC = (14, 30)
-_DIGEST_WINDOW = 14
+_DIGEST_WINDOW = 20
 
 
 def _is_digest_time(hour: int, minute: int) -> bool:
@@ -96,6 +96,8 @@ def main() -> None:
             print(f"[MAIN] [{idx}/{len(new_articles)}] {article['source']} — {article['title'][:70]}")
             _enrich(article)
             poster.post_article(article)
+            if processor.is_watchlist(article["title"], article.get("description", "")):
+                poster.post_breaking_alert(article)
             database.mark_seen(article)
             database.save_daily_story(article)
             total_posted += 1

@@ -36,7 +36,6 @@ jobs:
       - name: Run news bot
         run: python news_bot/main.py
         env:
-          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           WEBHOOK_QUEUE: ${{ secrets.WEBHOOK_QUEUE }}
           WEBHOOK_INDIA_GENERAL: ${{ secrets.WEBHOOK_INDIA_GENERAL }}
           WEBHOOK_INDIA_POLITICS: ${{ secrets.WEBHOOK_INDIA_POLITICS }}
@@ -57,6 +56,7 @@ jobs:
           WEBHOOK_INDIA_MARKETS: ${{ secrets.WEBHOOK_INDIA_MARKETS }}
           WEBHOOK_GLOBAL_ECONOMY: ${{ secrets.WEBHOOK_GLOBAL_ECONOMY }}
           WEBHOOK_DEFENCE: ${{ secrets.WEBHOOK_DEFENCE }}
+          WEBHOOK_BRICS: ${{ secrets.WEBHOOK_BRICS }}
           WEBHOOK_YOUTUBE: ${{ secrets.WEBHOOK_YOUTUBE }}
           WEBHOOK_API_NEWS: ${{ secrets.WEBHOOK_API_NEWS }}
           WEBHOOK_GOOGLE_ALERTS: ${{ secrets.WEBHOOK_GOOGLE_ALERTS }}
@@ -64,8 +64,8 @@ jobs:
           WEBHOOK_EVENING_WRAP: ${{ secrets.WEBHOOK_EVENING_WRAP }}
           WEBHOOK_BOT_LOGS: ${{ secrets.WEBHOOK_BOT_LOGS }}
           WEBHOOK_ERRORS: ${{ secrets.WEBHOOK_ERRORS }}
+          WEBHOOK_BREAKING_ALERTS: ${{ secrets.WEBHOOK_BREAKING_ALERTS }}
           WEBHOOK_FEED_HEALTH: ${{ secrets.WEBHOOK_FEED_HEALTH }}
-          GEMINI_API_KEY: ${{ secrets.GEMINI_API_KEY }}
           NEWSAPI_KEY: ${{ secrets.NEWSAPI_KEY }}
           GNEWS_KEY: ${{ secrets.GNEWS_KEY }}
           CURRENTS_KEY: ${{ secrets.CURRENTS_KEY }}

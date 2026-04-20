@@ -34,6 +34,7 @@ _CATEGORY_COLORS = {
     "world-general":     8311585,
     "global-economy":    16750848,
     "defence":           4886754,
+    "brics":             16744272,
     "youtube":           16711680,
     "api-news":          8421504,
 }
@@ -209,6 +210,36 @@ def post_log(message: str) -> None:
         requests.post(url, json={"content": f"📋 {message[:1900]}"}, timeout=10)
     except Exception:
         print(f"[LOG] {message}")
+
+
+def post_breaking_alert(article: dict) -> None:
+    """Posts a high-visibility embed to #breaking-alerts for watchlist articles."""
+    url = WEBHOOK_URLS.get("breaking-alerts")
+    if not url:
+        return
+
+    published = article.get("published")
+    ts = _published_iso(published)
+
+    embed: dict = {
+        "color": 15158332,  # bright red
+        "author": {"name": f"BREAKING  •  {article.get('source', '')}  •  {_time_ago(published)}"},
+        "title": article["title"][:256],
+        "url": article["url"],
+        "footer": {"text": f"NewsRoom Bot • Breaking Alert"},
+    }
+    if ts:
+        embed["timestamp"] = ts
+    if article.get("image_url"):
+        embed["image"] = {"url": article["image_url"]}
+
+    payload = {
+        "username": BOT_USERNAME,
+        "avatar_url": BOT_AVATAR_URL,
+        "content": "@everyone",
+        "embeds": [embed],
+    }
+    _post_webhook(url, payload)
 
 
 def post_error(message: str) -> None:
