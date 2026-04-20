@@ -71,7 +71,7 @@ FEEDS = [
     },
     {
         "name": "NDTV Politics",
-        "url": "https://feeds.feedburner.com/ndtvnews-politics-news",
+        "url": "https://www.ndtv.com/rss/politics",
         "category": "india-politics",
         "type": "rss",
     },
@@ -83,13 +83,13 @@ FEEDS = [
     },
     {
         "name": "NDTV Crime",
-        "url": "https://feeds.feedburner.com/ndtvnews-crime",
+        "url": "https://www.ndtv.com/rss/crime",
         "category": "scandals-outrages",
         "type": "rss",
     },
     {
         "name": "NDTV Business",
-        "url": "https://feeds.feedburner.com/ndtvnews-business-news",
+        "url": "https://www.ndtv.com/rss/business",
         "category": "india-economy",
         "type": "rss",
     },
@@ -179,13 +179,13 @@ FEEDS = [
     },
     {
         "name": "Reuters India",
-        "url": "https://feeds.reuters.com/reuters/INtopNews",
+        "url": "https://ir.thomsonreuters.com/rss/news-releases.xml",
         "category": "india-general",
         "type": "rss",
     },
     {
         "name": "Reuters India Business",
-        "url": "https://feeds.reuters.com/reuters/INbusinessNews",
+        "url": "https://www.reuters.com/rssFeed/businessNews",
         "category": "india-markets",
         "type": "rss",
     },
@@ -247,7 +247,7 @@ FEEDS = [
     },
     {
         "name": "Reuters Top",
-        "url": "https://feeds.reuters.com/reuters/topNews",
+        "url": "https://www.reuters.com/rssFeed/topNews",
         "category": "geopolitics",
         "type": "rss",
     },

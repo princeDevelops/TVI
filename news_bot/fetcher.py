@@ -72,8 +72,10 @@ def fetch_rss_feed(feed_cfg: dict) -> tuple[list[dict], bool]:
 
 def fetch_youtube_feed(feed_cfg: dict) -> tuple[list[dict], bool]:
     try:
+        # YouTube Atom feeds often set bozo=True due to namespace warnings
+        # even when entries are perfectly valid — only fail if entries are empty.
         parsed = feedparser.parse(feed_cfg["url"], request_headers=_RSS_HEADERS)
-        if parsed.bozo and not parsed.entries:
+        if not parsed.entries:
             return [], False
 
         articles: list[dict] = []

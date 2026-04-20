@@ -62,14 +62,42 @@ Line 3 — The Context: How this connects to a larger ongoing trend. Add the cur
 Line 4 — The Question: A human-centric question that prompts replies, not retweets. Make it specific to this story.
 Footer — "via [Source Name]" on its own line."""
 
+_CATEGORY_GUIDE = """\
+Read the article content carefully and assign the single best matching category:
+
+india-general      = India news that does not fit a more specific category below
+india-politics     = Indian party politics, political leaders, BJP/Congress/AAP/TMC moves
+india-parliament   = Lok Sabha, Rajya Sabha, parliamentary sessions, bills passing, MPs, Speaker
+india-elections    = Election results, voting, EVMs, campaign trail, seat projections, EC rulings
+india-states       = State government news, Chief Ministers, state legislation, governor's rule
+india-govt-policy  = Central government schemes, ministry orders, regulatory policy, ordinances
+india-economy      = India macro economy, GDP, RBI, inflation, fiscal deficit, budget
+india-markets      = BSE/NSE, Sensex/Nifty, IPOs, stocks, mutual funds, FII flows
+hindu-muslim       = Communal relations, temple/mosque disputes, conversion, religious violence
+scandals-outrages  = Corruption, scams, arrests of public figures, controversies, crimes by elites
+pak-general        = Pakistan news that does not fit a more specific category below
+pak-government     = Pakistan PM, cabinet, Parliament, PPP/PML-N/PTI governance
+pak-military       = Pakistan Army, COAS, ISI, military courts, civil-military relations
+pak-economy        = Pakistan economy, IMF bailout, rupee, inflation, CPEC, debt
+geopolitics        = India-Pakistan relations, India-China, US-India, multilateral diplomacy
+wars-conflicts     = Active military conflicts, airstrikes, casualties, war zones globally
+world-general      = International news that does not fit geopolitics or wars-conflicts
+global-economy     = Global markets, US Fed, oil prices, world trade, sanctions
+defence            = Indian or Pakistani military hardware, defence deals, armed forces ops
+youtube            = YouTube video uploads only
+api-news           = Generic API-sourced news without a better fit"""
+
 _USER_TEMPLATE = """\
 Analyze this news article and return ONLY a raw JSON object.
 
 Source: {source}
-Category: {category}
+Suggested category: {category}
 Original Title: {title}
 Description: {description}
 Article Body: {body}
+
+CATEGORY REFERENCE:
+{category_guide}
 
 Return this exact JSON:
 {{
@@ -77,7 +105,7 @@ Return this exact JSON:
   "summary_points": ["<point 1>", "<point 2>", "<point 3>"],
   "why_it_matters": "<Concrete 1-2 sentence implication. Specific about who is affected and how. No vague language.>",
   "confidence": "<confirmed | developing | unverified>",
-  "category_refined": "<Same category string passed in, or corrected if clearly wrong. Only valid channel keys.>",
+  "category_refined": "<Pick the single best category from the CATEGORY REFERENCE above based on article content. Ignore the suggested category if a more specific one fits better.>",
   "flag": "<most relevant country flag emoji>",
   "impact_score": <integer 1-10, where 10 is a history-changing event>,
   "x_post": "<Four-line post following the Hook/Insight/Context/Question structure. Zero emojis. Zero m-dashes. Under 280 chars. Source on its own line at the end.>"
@@ -96,6 +124,7 @@ def _build_prompt(title: str, description: str, body: str | None,
         title=title,
         description=groq_desc,
         body=groq_body,
+        category_guide=_CATEGORY_GUIDE,
     )
 
 
