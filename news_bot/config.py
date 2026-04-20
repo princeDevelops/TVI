@@ -332,11 +332,6 @@ FEEDS = [
     },
 ]
 
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
-GROQ_MODEL = "llama-3.3-70b-versatile"
-
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GEMINI_MODEL = "gemini-2.0-flash"
 
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY")
 GNEWS_KEY = os.getenv("GNEWS_KEY")
@@ -353,8 +348,8 @@ API_DAILY_CAPS = {
     "newsapi":  95,
 }
 
-MAX_ARTICLES_PER_RUN = 20
-ARTICLE_DELAY = 1.5
+MAX_ARTICLES_PER_RUN = 50
+ARTICLE_DELAY = 0.5
 WEBHOOK_DELAY = 0.5
 GROQ_DELAY = 1.0
 

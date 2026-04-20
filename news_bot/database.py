@@ -85,8 +85,7 @@ def mark_seen(article: dict) -> None:
         conn.commit()
 
 
-def save_daily_story(article: dict, ai_result: dict) -> None:
-    summary = "\n".join(ai_result.get("summary_points", []))
+def save_daily_story(article: dict) -> None:
     with _conn() as conn:
         conn.execute(
             """INSERT OR REPLACE INTO daily_stories
@@ -95,10 +94,10 @@ def save_daily_story(article: dict, ai_result: dict) -> None:
             (
                 _article_id(article["url"]),
                 article.get("title", ""),
-                ai_result.get("tweaked_title") or article.get("title", ""),
-                summary,
-                ai_result.get("why_it_matters", ""),
-                ai_result.get("category_refined") or article.get("category", ""),
+                article.get("title", ""),
+                "",
+                "",
+                article.get("category", ""),
                 article.get("source", ""),
                 article["url"],
                 article.get("image_url"),

@@ -6,7 +6,6 @@ from datetime import datetime, timezone
 
 import requests
 
-import config
 from config import (
     BOT_AVATAR_URL,
     BOT_USERNAME,
@@ -15,6 +14,31 @@ from config import (
     WEBHOOK_URLS,
 )
 
+_CATEGORY_COLORS = {
+    "india-general":     2067276,
+    "india-politics":    3447003,
+    "india-parliament":  1752220,
+    "india-elections":   10181046,
+    "india-states":      3066993,
+    "india-govt-policy": 2123412,
+    "india-economy":     15844367,
+    "india-markets":     16776960,
+    "hindu-muslim":      15158332,
+    "scandals-outrages": 10038562,
+    "pak-general":       1146986,
+    "pak-government":    3447003,
+    "pak-military":      7419530,
+    "pak-economy":       15844367,
+    "geopolitics":       9807270,
+    "wars-conflicts":    15158332,
+    "world-general":     8311585,
+    "global-economy":    16750848,
+    "defence":           4886754,
+    "youtube":           16711680,
+    "api-news":          8421504,
+}
+
+
 def _strip_html(text: str) -> str:
     text = re.sub(r"<[^>]+>", "", text)
     text = re.sub(r"&nbsp;", " ", text)
@@ -22,24 +46,8 @@ def _strip_html(text: str) -> str:
     text = re.sub(r"&lt;", "<", text)
     text = re.sub(r"&gt;", ">", text)
     text = re.sub(r"&quot;", '"', text)
-    text = re.sub(r"\s+", " ", text).strip()
-    return text
+    return re.sub(r"\s+", " ", text).strip()
 
-
-_CONFIDENCE_COLORS = {
-    "confirmed":  3066993,
-    "developing": 16750848,
-    "unverified": 15158332,
-}
-
-_CONFIDENCE_EMOJIS = {
-    "confirmed":  "🟢",
-    "developing": "🟡",
-    "unverified": "🔴",
-}
-
-
-# ── utilities ──────────────────────────────────────────────────────────────────
 
 def _time_ago(published: datetime | None) -> str:
     if published is None:
@@ -47,18 +55,18 @@ def _time_ago(published: datetime | None) -> str:
     if published.tzinfo is None:
         published = published.replace(tzinfo=timezone.utc)
     diff = datetime.now(timezone.utc) - published
-    seconds = int(diff.total_seconds())
-    if seconds < 60:
+    s = int(diff.total_seconds())
+    if s < 60:
         return "just now"
-    if seconds < 3600:
-        m = seconds // 60
+    if s < 3600:
+        m = s // 60
         return f"{m} min{'s' if m != 1 else ''} ago"
-    if seconds < 86400:
-        h = seconds // 3600
+    if s < 86400:
+        h = s // 3600
         return f"{h} hr{'s' if h != 1 else ''} ago"
-    if seconds < 172800:
+    if s < 172800:
         return "Yesterday"
-    return f"{seconds // 86400} days ago"
+    return f"{s // 86400} days ago"
 
 
 def _published_iso(published: datetime | None) -> str | None:
@@ -69,112 +77,78 @@ def _published_iso(published: datetime | None) -> str | None:
     return published.isoformat()
 
 
-def _post_webhook(webhook_url: str | None, payload: dict) -> bool:
-    if not webhook_url:
+def _post_webhook(url: str | None, payload: dict) -> bool:
+    if not url:
         return False
     try:
-        resp = requests.post(webhook_url, json=payload, timeout=10)
+        resp = requests.post(url, json=payload, timeout=10)
         time.sleep(WEBHOOK_DELAY)
         if resp.status_code not in (200, 204):
-            _log_error(
-                f"Webhook returned {resp.status_code}: {resp.text[:200]}"
-            )
+            _log_error(f"Webhook {resp.status_code}: {resp.text[:200]}")
             return False
         return True
     except Exception as e:
-        _log_error(f"Webhook POST exception: {e}")
+        _log_error(f"Webhook POST failed: {e}")
         return False
 
 
 def _log_error(message: str) -> None:
-    error_url = WEBHOOK_URLS.get("errors")
-    if not error_url:
+    url = WEBHOOK_URLS.get("errors")
+    if not url:
         print(f"[ERROR] {message}")
         return
     try:
-        requests.post(
-            error_url,
-            json={"content": f"⚠️ `{message[:1900]}`"},
-            timeout=10,
-        )
+        requests.post(url, json={"content": f"⚠️ `{message[:1900]}`"}, timeout=10)
     except Exception:
         print(f"[ERROR] {message}")
 
 
-# ── public functions ───────────────────────────────────────────────────────────
-
-def post_article(article: dict, ai_result: dict) -> None:
+def post_article(article: dict) -> None:
     if article.get("type") == "youtube":
         _post_youtube(article)
         return
 
-    category = ai_result.get("category_refined") or article.get("category", "world-general")
-    tweaked_title = ai_result.get("tweaked_title") or article["title"]
-    summary_points = ai_result.get("summary_points") or []
-    why_it_matters = ai_result.get("why_it_matters") or ""
-    confidence = ai_result.get("confidence", "unverified")
-    flag = ai_result.get("flag", "🌐")
-
-    color = _CONFIDENCE_COLORS.get(confidence, _CONFIDENCE_COLORS["unverified"])
-    conf_emoji = _CONFIDENCE_EMOJIS.get(confidence, "🔴")
+    category = article.get("category", "world-general")
+    color = _CATEGORY_COLORS.get(category, 8421504)
     category_label = CATEGORY_LABELS.get(category, category)
 
     published = article.get("published")
     time_ago_str = _time_ago(published)
     ts = _published_iso(published)
 
-    raw_desc = _strip_html((article.get("description") or "").strip())
-    body_text = _strip_html((article.get("body") or "").strip())
-    summary_str = (
-        "\n".join(f"• {p}" for p in summary_points) if summary_points else "• Not available"
-    )
-    x_post = ai_result.get("x_post", "").strip()
-    impact_score = ai_result.get("impact_score", 5)
+    raw_desc = _strip_html((article.get("description") or ""))
+    body_text = _strip_html((article.get("body") or ""))
 
     def _field(name: str, value: str) -> dict:
         return {"name": name, "value": value[:1024] or "\u200b", "inline": False}
 
-    # Body goes in description (4096 char limit) — stays as one unbroken block
-    body_section = body_text[:4000] if body_text else "*Body not available for this source.*"
-
     fields = []
-    fields.append(_field("📰 Original Headline", article["title"]))
     if raw_desc:
-        fields.append(_field("📄 RSS Description", raw_desc[:1024]))
-    fields.append(_field("💡 AI Summary", summary_str))
-    fields.append(_field("📌 Why It Matters", why_it_matters or "*Not available.*"))
-    if x_post:
-        x_value = f"```\n{x_post[:980]}\n```"
-        fields.append(_field(f"X Post • Impact {impact_score}/10", x_value))
+        fields.append(_field("📄 Description", raw_desc[:1024]))
 
     embed: dict = {
         "color": color,
         "author": {
-            "name": f"{flag}  {category_label.upper()}  •  {article['source']}  •  {time_ago_str}"
+            "name": f"{category_label.upper()}  •  {article['source']}  •  {time_ago_str}"
         },
-        "title": tweaked_title[:256],
+        "title": article["title"][:256],
         "url": article["url"],
-        "description": f"**📖 Article Body**\n{body_section}",
+        "description": f"**📖 Article Body**\n{body_text[:4000]}" if body_text else None,
         "fields": fields,
-        "footer": {
-            "text": (
-                f"{conf_emoji} {confidence.capitalize()} • 🤖 llama-3.3-70b"
-            )
-        },
+        "footer": {"text": f"📰 {article['source']}"},
     }
+
+    # Remove description key entirely if empty to avoid Discord rejecting null
+    if not embed["description"]:
+        del embed["description"]
+
     if ts:
         embed["timestamp"] = ts
-    image_url = article.get("image_url")
-    if image_url:
-        embed["image"] = {"url": image_url}
+    if article.get("image_url"):
+        embed["image"] = {"url": article["image_url"]}
 
-    payload = {
-        "username": BOT_USERNAME,
-        "avatar_url": BOT_AVATAR_URL,
-        "embeds": [embed],
-    }
+    payload = {"username": BOT_USERNAME, "avatar_url": BOT_AVATAR_URL, "embeds": [embed]}
 
-    # Post to category channel then queue
     _post_webhook(WEBHOOK_URLS.get(category), payload)
     _post_webhook(WEBHOOK_URLS.get("queue"), payload)
 
@@ -184,79 +158,55 @@ def _post_youtube(article: dict) -> None:
     thumbnail = article.get("thumbnail_url") or (
         f"https://img.youtube.com/vi/{video_id}/maxresdefault.jpg" if video_id else None
     )
-    description = (article.get("description") or "")[:300]
-    if len(article.get("description") or "") > 300:
-        description += "..."
+    description = _strip_html((article.get("description") or ""))[:300]
 
     published = article.get("published")
     ts = _published_iso(published)
 
     embed: dict = {
         "color": 16711680,
-        "author": {"name": f"▶️ {article['source']}"},
+        "author": {"name": f"▶️  {article['source']}  •  {_time_ago(published)}"},
         "title": article["title"][:256],
         "url": article["url"],
-        "description": (
-            f"**▶️ New video uploaded**\n\n"
-            f"{description or '*No description available.*'}"
-        ),
-        "footer": {
-            "text": f"📺 YouTube • {article['source']} • 🕐 {_time_ago(published)}"
-        },
+        "description": f"**▶️ New video**\n\n{description or '*No description.*'}",
+        "footer": {"text": f"📺 YouTube • {article['source']}"},
     }
     if ts:
         embed["timestamp"] = ts
     if thumbnail:
         embed["image"] = {"url": thumbnail}
 
-    payload = {
-        "username": BOT_USERNAME,
-        "avatar_url": BOT_AVATAR_URL,
-        "embeds": [embed],
-    }
-
+    payload = {"username": BOT_USERNAME, "avatar_url": BOT_AVATAR_URL, "embeds": [embed]}
     _post_webhook(WEBHOOK_URLS.get("youtube"), payload)
     _post_webhook(WEBHOOK_URLS.get("queue"), payload)
 
 
 def post_feed_health(feed_health: dict, total_new: int) -> None:
-    webhook_url = WEBHOOK_URLS.get("feed-health")
-    if not webhook_url:
+    url = WEBHOOK_URLS.get("feed-health")
+    if not url:
         return
-
-    failed = [n for n, info in feed_health.items() if not info["success"]]
-    zero = [n for n, info in feed_health.items() if info["success"] and info["count"] == 0]
-    succeeded = len(feed_health) - len(failed)
-
+    failed = [n for n, i in feed_health.items() if not i["success"]]
+    zero = [n for n, i in feed_health.items() if i["success"] and i["count"] == 0]
+    ok = len(feed_health) - len(failed)
     lines = [
-        f"**📊 Feed Health — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}**",
-        f"New articles posted: **{total_new}**",
-        f"Feeds OK: **{succeeded}/{len(feed_health)}**",
+        f"**Feed Health — {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}**",
+        f"New articles posted: **{total_new}** | Feeds OK: **{ok}/{len(feed_health)}**",
     ]
     if failed:
-        lines.append(f"\n❌ **Failed ({len(failed)}):**")
-        lines += [f"• {n}" for n in failed[:20]]
+        lines += [f"\n❌ **Failed ({len(failed)}):**"] + [f"• {n}" for n in failed[:20]]
     if zero:
-        lines.append(f"\n⚠️ **Zero items ({len(zero)}):**")
-        lines += [f"• {n}" for n in zero[:20]]
-
-    content = "\n".join(lines)
-    if len(content) > 1900:
-        content = content[:1897] + "..."
-    _post_webhook(webhook_url, {"content": content})
+        lines += [f"\n⚠️ **Zero items ({len(zero)}):**"] + [f"• {n}" for n in zero[:20]]
+    content = "\n".join(lines)[:1900]
+    _post_webhook(url, {"content": content})
 
 
 def post_log(message: str) -> None:
-    webhook_url = WEBHOOK_URLS.get("bot-logs")
-    if not webhook_url:
+    url = WEBHOOK_URLS.get("bot-logs")
+    if not url:
         print(f"[LOG] {message}")
         return
     try:
-        requests.post(
-            webhook_url,
-            json={"content": f"📋 {message[:1900]}"},
-            timeout=10,
-        )
+        requests.post(url, json={"content": f"📋 {message[:1900]}"}, timeout=10)
     except Exception:
         print(f"[LOG] {message}")
 
